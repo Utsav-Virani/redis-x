@@ -100,7 +100,6 @@ func hgetall(args []Value) Value {
 		return Value{typ: "error", str: "ERR wrong number of arguments for 'hgetall' command"}
 	}
 	key := args[0].bulk
-
 	SETsmu.RLock()
 	fields, ok := HSETs[key]
 	SETsmu.RUnlock()

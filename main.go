@@ -15,14 +15,21 @@ import (
 func main() {
 	fmt.Println("Listening on port :6379")
 
-	// Listen for TCP connections on port 6379
+	// Create a new server
 	l, err := net.Listen("tcp", ":6379")
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	// Accept incoming connections
+	aof, err := NewAOF("database.aof")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer aof.Close()
+
+	// Listen for connections
 	conn, err := l.Accept()
 	if err != nil {
 		fmt.Println(err)
@@ -43,22 +50,29 @@ func main() {
 			fmt.Println("Invalid request, expected array")
 			continue
 		}
+
 		if len(value.array) == 0 {
-			fmt.Println("Invalid request, empty array")
+			fmt.Println("Invalid request, expected array length > 0")
 			continue
 		}
 
-		cmd := strings.ToUpper(value.array[0].bulk)
+		command := strings.ToUpper(value.array[0].bulk)
 		args := value.array[1:]
 
-		writter := NewWritter(conn)
-		handler, ok := Handlers[cmd]
+		writer := NewWritter(conn)
+
+		handler, ok := Handlers[command]
 		if !ok {
-			fmt.Printf("Unknown command: %v\n", cmd)
-			writter.Write(Value{typ: "string", str: ""})
+			fmt.Println("Invalid command: ", command)
+			writer.Write(Value{typ: "string", str: ""})
 			continue
 		}
+
+		if command == "SET" || command == "HSET" {
+			aof.Write(value)
+		}
+
 		result := handler(args)
-		writter.Write(result)
+		writer.Write(result)
 	}
 }
